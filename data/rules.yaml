@@ -1,0 +1,44 @@
+# Business rules for data/orders.csv. Every rule names a column and a check.
+# Paths are relative to this file. See the README for the full list of checks.
+
+key: order_id            # the column that should identify a row
+as_of: 2026-03-31        # "today" for the not_in_future check (leave out to use the real date)
+
+rules:
+  - column: order_id
+    check: not_null
+
+  - column: order_id
+    check: unique
+
+  - column: category
+    check: allowed_values
+    values: [Electronics, Furniture, Stationery, Kitchen, Apparel]
+
+  - column: quantity
+    check: range
+    min: 1
+
+  - column: discount_pct
+    check: range
+    min: 0
+    max: 50
+    severity: Medium
+
+  - column: email
+    check: regex
+    pattern: '[\w.+-]+@[\w-]+(\.[\w-]+)+'
+    severity: Medium
+
+  - column: order_date
+    check: not_in_future
+
+  - column: order_date
+    check: less_or_equal
+    other: ship_date
+    name: order_date is on or before ship_date
+
+  - column: customer_id
+    check: exists_in
+    file: customer_master.csv
+    other: customer_id

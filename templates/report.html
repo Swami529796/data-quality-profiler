@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data quality profile: {{ source }}</title>
+<style>
+  :root { --navy: #1F4E78; --blue: #9DB7D5; --amber: #E08A00; --grey: #595959; --red: #B03A2E; --line: #DDE3EA; --pale: #F4F7FA; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #222; background: #fff; margin: 0; line-height: 1.45; font-size: 14px; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 24px 20px 48px; }
+  h1 { color: var(--navy); font-size: 24px; margin: 0 0 4px; }
+  h2 { color: var(--navy); font-size: 17px; margin: 34px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--navy); }
+  .sub { color: var(--grey); margin: 0; }
+  .panel { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 18px; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; background: var(--pale); }
+  .score-card { flex: 0 0 210px; text-align: center; }
+  .score-card .big { font-size: 46px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+  .score-card .of { color: var(--grey); }
+  .parts { flex: 1 1 300px; }
+  .facts { flex: 1 1 300px; }
+  .facts table, .parts table { width: 100%; border-collapse: collapse; }
+  .facts td, .parts td { padding: 3px 0; border: 0; vertical-align: middle; }
+  .facts td:last-child { text-align: right; font-weight: 600; }
+  .parts td:first-child { width: 110px; }
+  .parts td:last-child { width: 52px; text-align: right; font-weight: 600; }
+  .wrap { overflow-x: auto; }
+  table.grid { width: 100%; border-collapse: collapse; }
+  table.grid th { background: var(--navy); color: #fff; text-align: left; padding: 7px 8px; font-weight: 600; white-space: nowrap; }
+  table.grid td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.grid tr:nth-child(even) td { background: #FAFBFC; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .bar { display: inline-block; width: 70px; height: 9px; background: #E6EBF1; border-radius: 5px; vertical-align: middle; margin-right: 6px; overflow: hidden; }
+  .bar.wide { width: 100%; margin: 0; }
+  .bar span { display: block; height: 100%; background: var(--navy); }
+  .bar span.warn { background: var(--amber); }
+  .bar span.bad { background: var(--red); }
+  .bar span.miss { background: var(--amber); }
+  .badge { display: inline-block; padding: 1px 9px; border-radius: 10px; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .High, .Fail { background: var(--red); } .Medium { background: var(--amber); } .Low { background: var(--blue); color: #1b2b3a; }
+  .Pass { background: var(--navy); } .Notrun { background: var(--grey); }
+  .mono { font-family: Consolas, "Courier New", monospace; font-size: 13px; }
+  .small { color: var(--grey); font-size: 12.5px; }
+  .note { background: var(--pale); border-left: 4px solid var(--blue); padding: 10px 14px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Data quality profile: {{ source }}</h1>
+  <p class="sub">Created {{ generated }}. {{ "{:,}".format(table.rows) }} rows and {{ table.columns }} columns.
+    {% if table.blank_rows %}Column figures leave out the {{ table.blank_rows }} completely blank row{{ "s" if table.blank_rows != 1 }}.{% endif %}</p>
+
+  {% macro cls(value) %}{{ "bad" if value < 80 else "warn" if value < 95 else "" }}{% endmacro %}
+
+  <div class="panel">
+    <div class="card score-card">
+      <div class="small">Overall quality score</div>
+      <div class="big">{{ "%.1f"|format(score) }}</div>
+      <div class="of">out of 100</div>
+      <div class="small" style="margin-top:8px">A summary, not a guarantee</div>
+    </div>
+    <div class="card parts">
+      <table>
+        {% for part, value in parts.items() %}
+        <tr>
+          <td>{{ part|title }}</td>
+          <td>{% if value is not none %}<div class="bar wide"><span class="{{ cls(value) }}" style="width:{{ value }}%"></span></div>{% else %}<span class="small">not applicable</span>{% endif %}</td>
+          <td>{{ "%.1f"|format(value) if value is not none else "" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <p class="small" style="margin:8px 0 0">Average across the columns each part applies to.</p>
+    </div>
+    <div class="card facts">
+      <table>
+        <tr><td>Exact duplicate rows</td><td>{{ "{:,}".format(table.duplicate_rows) }}</td></tr>
+        {% if table.key %}<tr><td>Duplicate keys ({{ table.key|join(" + ") }})</td><td>{{ "not checked" if table.duplicate_keys is none else "{:,}".format(table.duplicate_keys) }}</td></tr>{% endif %}
+        <tr><td>Completely blank rows</td><td>{{ table.blank_rows }}</td></tr>
+        <tr><td>Completely empty columns</td><td>{{ table.empty_columns|join(", ") or "none" }}</td></tr>
+        <tr><td>Constant columns</td><td>{{ table.constant_columns|join(", ") or "none" }}</td></tr>
+        <tr><td>Issues: high / medium / low</td><td>{{ issue_counts.High }} / {{ issue_counts.Medium }} / {{ issue_counts.Low }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Columns</h2>
+  <div class="wrap">
+  <table class="grid">
+    <tr><th>Column</th><th>Type</th><th>Missing</th><th class="num">Distinct</th><th>Score</th><th>Range or length</th><th>Usual pattern</th><th>Most common values</th><th>Findings</th></tr>
+    {% for c in columns %}
+    <tr>
+      <td><strong>{{ c.name }}</strong></td>
+      <td>{{ c.type }}</td>
+      <td style="white-space:nowrap"><div class="bar"><span class="miss" style="width:{{ c.missing_pct }}%"></span></div>{{ "%.1f"|format(c.missing_pct) }}%</td>
+      <td class="num">{{ "{:,}".format(c.distinct) }}</td>
+      <td style="white-space:nowrap"><div class="bar"><span class="{{ cls(c.score) }}" style="width:{{ c.score }}%"></span></div>{{ "%.1f"|format(c.score) }}</td>
+      <td>{{ c.detail }}</td>
+      <td class="mono">{{ c.pattern }}</td>
+      <td class="small">{{ c.top }}</td>
+      <td class="small">{{ c.flags }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <h2>Issues, most serious first ({{ issues|length }})</h2>
+  {% if issues %}
+  <div class="wrap">
+  <table class="grid">
+    <tr><th>Severity</th><th>Column</th><th>Issue</th><th class="num">Rows</th><th class="num">% of values</th><th>Examples</th></tr>
+    {% for i in issues %}
+    <tr>
+      <td><span class="badge {{ i.severity }}">{{ i.severity }}</span></td>
+      <td><strong>{{ i.column }}</strong></td>
+      <td>{{ i.issue }}</td>
+      <td class="num">{{ "{:,}".format(i.count) }}</td>
+      <td class="num">{{ "%.2f"|format(i.pct) }}%</td>
+      <td class="small mono">{{ i.examples }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}<p>No issues found.</p>{% endif %}
+
+  <h2>Business rules ({{ rules|length }})</h2>
+  {% if rules %}
+  <div class="wrap">
+  <table class="grid">
+    <tr><th>Status</th><th>Rule</th><th>Check</th><th class="num">Checked</th><th class="num">Failed</th><th class="num">% failed</th><th class="num">Could not be checked</th><th>Examples or reason</th></tr>
+    {% for r in rules %}
+    <tr>
+      <td><span class="badge {{ r.status|replace(' ', '') }}">{{ r.status }}</span></td>
+      <td><strong>{{ r.name or "(rule)" }}</strong></td>
+      <td class="mono">{{ r.check }}</td>
+      <td class="num">{{ "{:,}".format(r.checked) }}</td>
+      <td class="num">{{ "{:,}".format(r.failed) }}</td>
+      <td class="num">{{ "%.2f"|format(r.pct) }}%</td>
+      <td class="num">{{ r.unchecked }}</td>
+      <td class="small mono">{{ r.examples or r.reason }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  <p class="small">"Could not be checked" counts values the rule cannot read (for example text in a date column). They are already listed above as values that do not fit the column type.</p>
+  {% else %}<p>No rules file was given, so only the automatic checks were run.</p>{% endif %}
+
+  <h2>How the score is worked out</h2>
+  <div class="note">
+    <p style="margin-top:0">Each column gets four part-scores from 0 to 100:</p>
+    <ul>
+      <li><strong>Completeness</strong> ({{ (weights.completeness * 100)|int }}%): share of rows that have a value. Placeholders such as N/A count as missing.</li>
+      <li><strong>Validity</strong> ({{ (weights.validity * 100)|int }}%): share of values that fit the column type, follow the usual pattern and pass the rules.</li>
+      <li><strong>Uniqueness</strong> ({{ (weights.uniqueness * 100)|int }}%): share of values that do not repeat an earlier one. Only for the key, identifier-like columns and columns with a <span class="mono">unique</span> rule.</li>
+      <li><strong>Consistency</strong> ({{ (weights.consistency * 100)|int }}%): share of values free of stray spaces, mixed capital letters, and numbers or dates written differently from the rest.</li>
+    </ul>
+    <p style="margin-bottom:0">The column score is the weighted average of the parts that apply. The overall score is the plain average of the column scores, reduced by the share of exact duplicate rows. Outliers and constant columns are listed but do not change the score. A high score means none of these checks found much; it does not prove the data is correct.</p>
+  </div>
+  <p class="small">Settings: type threshold {{ options.type_threshold }}, pattern threshold {{ options.pattern_threshold }}, IQR multiplier {{ options.iqr_k }}, date order {{ options.date_order }}, as-of date {{ options.as_of }}. Row numbers are file rows (row 1 is the header). The Excel file lists all {{ "{:,}".format(failed_rows) }} failing values.</p>
+</div>
+</body>
+</html>

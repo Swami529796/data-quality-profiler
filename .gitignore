@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Generated output (run: python profile_data.py)
+output/
+
+# Excel lock files
+~$*
+
+# Windows
+Thumbs.db
+desktop.ini
